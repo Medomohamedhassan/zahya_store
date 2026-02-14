@@ -1,11 +1,10 @@
-# Podfile fixed to work on GitHub runner
+# Podfile fixed for GitHub runner
 platform :ios, '15.0'
 
-# Re-implementing the parts of podhelper.rb that are needed 
-# because the relative path on Windows/Mac might differ
-
+# Manual implementation of Flutter plugin loading to avoid dependency on podhelper.rb
 def flutter_install_ios_engine_pod(ios_application_path)
   podspec_directory = File.join(ios_application_path, 'Flutter')
+  system("mkdir -p \"#{podspec_directory}\"")
   copied_podspec_path = File.expand_path('Flutter.podspec', podspec_directory)
   File.open(copied_podspec_path, 'w') do |podspec|
     podspec.write <<~EOF
@@ -26,25 +25,39 @@ def flutter_install_ios_engine_pod(ios_application_path)
 end
 
 def flutter_install_plugin_pods(ios_application_path)
-  # Path to the plugins file
   plugins_file = File.join(ios_application_path, '..', '.flutter-plugins-dependencies')
-  if File.exist?(plugins_file)
-    require 'json'
-    dependencies_hash = JSON.parse(File.read(plugins_file))
-    if dependencies_hash['plugins'] && dependencies_hash['plugins']['ios']
-      dependencies_hash['plugins']['ios'].each do |plugin|
-        plugin_name = plugin['name']
-        plugin_path = plugin['path']
-        
-        # Create a symlink in the ios directory like Flutter does
-        symlink_dir = File.join(ios_application_path, '.symlinks', 'plugins')
-        system("mkdir -p \"#{symlink_dir}\"")
-        symlink = File.join(symlink_dir, plugin_name)
-        system("ln -s \"#{plugin_path}\" \"#{symlink}\"") unless File.exist?(symlink)
-        
-        pod plugin_name, path: File.join('.symlinks', 'plugins', plugin_name, 'ios')
-      end
+  return unless File.exist?(plugins_file)
+
+  require 'json'
+  dependencies_hash = JSON.parse(File.read(plugins_file))
+  return unless dependencies_hash['plugins'] && dependencies_hash['plugins']['ios']
+
+  dependencies_hash['plugins']['ios'].each do |plugin|
+    plugin_name = plugin['name']
+    plugin_path = plugin['path']
+    shared_darwin_source = plugin['shared_darwin_source'] || false
+    
+    # Path inside the plugin: 'ios' or 'darwin'
+    platform_dir = shared_darwin_source ? 'darwin' : 'ios'
+    
+    # Symlink directory
+    symlink_parent = File.join(ios_application_path, '.symlinks', 'plugins')
+    system("mkdir -p \"#{symlink_parent}\"")
+    
+    # Symlink name
+    symlink = File.join(symlink_parent, plugin_name)
+    
+    # Crucial: On the Mac runner, we need to create the actual symlink to the absolute path
+    # But since we are on Windows, we just write the logic. The Mac runner will run this Ruby code.
+    begin
+      File.symlink(plugin_path, symlink) unless File.exist?(symlink)
+    rescue
+      # Fallback to system command if Ruby symlink fails
+      system("ln -s \"#{plugin_path}\" \"#{symlink}\"")
     end
+    
+    # Point CocoaPods to the folder containing the .podspec
+    pod plugin_name, path: File.join('.symlinks', 'plugins', plugin_name, platform_dir)
   end
 end
 
