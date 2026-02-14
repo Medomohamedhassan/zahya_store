@@ -1,20 +1,64 @@
-# Standard Flutter Podfile
+# Podfile fixed to work on GitHub runner
 platform :ios, '15.0'
 
-# The Flutter helper script
-require_relative '../Flutter/podhelper'
+# Re-implementing the parts of podhelper.rb that are needed 
+# because the relative path on Windows/Mac might differ
+
+def flutter_install_ios_engine_pod(ios_application_path)
+  podspec_directory = File.join(ios_application_path, 'Flutter')
+  copied_podspec_path = File.expand_path('Flutter.podspec', podspec_directory)
+  File.open(copied_podspec_path, 'w') do |podspec|
+    podspec.write <<~EOF
+      Pod::Spec.new do |s|
+        s.name             = 'Flutter'
+        s.version          = '1.0.0'
+        s.summary          = 'A UI toolkit for beautiful and fast apps.'
+        s.homepage         = 'https://flutter.dev'
+        s.license          = { :type => 'BSD' }
+        s.author           = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
+        s.source           = { :git => 'https://github.com/flutter/engine', :tag => s.version.to_s }
+        s.ios.deployment_target = '12.0'
+        s.vendored_frameworks = 'path/to/nothing'
+      end
+    EOF
+  end
+  pod 'Flutter', path: 'Flutter'
+end
+
+def flutter_install_plugin_pods(ios_application_path)
+  # Path to the plugins file
+  plugins_file = File.join(ios_application_path, '..', '.flutter-plugins-dependencies')
+  if File.exist?(plugins_file)
+    require 'json'
+    dependencies_hash = JSON.parse(File.read(plugins_file))
+    if dependencies_hash['plugins'] && dependencies_hash['plugins']['ios']
+      dependencies_hash['plugins']['ios'].each do |plugin|
+        plugin_name = plugin['name']
+        plugin_path = plugin['path']
+        
+        # Create a symlink in the ios directory like Flutter does
+        symlink_dir = File.join(ios_application_path, '.symlinks', 'plugins')
+        system("mkdir -p \"#{symlink_dir}\"")
+        symlink = File.join(symlink_dir, plugin_name)
+        system("ln -s \"#{plugin_path}\" \"#{symlink}\"") unless File.exist?(symlink)
+        
+        pod plugin_name, path: File.join('.symlinks', 'plugins', plugin_name, 'ios')
+      end
+    end
+  end
+end
 
 target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  ios_application_path = File.dirname(File.realpath(__FILE__))
+  flutter_install_ios_engine_pod(ios_application_path)
+  flutter_install_plugin_pods(ios_application_path)
 end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    flutter_additional_ios_build_settings(target)
-    
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings['SWIFT_VERSION'] = '5.0'
