@@ -22,7 +22,7 @@ environment:
   sdk: '>=3.4.0 <4.0.0'
 
 dependencies:
-  chewie: ^1.12.1
+  chewie: ^1.11.3
   flutter:
     sdk: flutter
   flutter_credit_card: ^4.1.0
