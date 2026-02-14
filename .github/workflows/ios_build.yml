@@ -1,0 +1,57 @@
+name: Build iOS
+
+on:
+  workflow_dispatch: # Allows manual trigger
+  push:
+    branches:
+      - main # Or your default branch name
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0' # Matches your environment or common stable
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+          cd ..
+
+      - name: Build iOS (No Codesign - Physical)
+        run: flutter build ios --release --no-codesign
+
+      - name: Build iOS (Simulator - for Testing)
+        run: flutter build ios --simulator --debug
+
+      - name: Prepare Artifacts
+        run: |
+          # Prepare IPA for physical devices
+          mkdir -p build/ios/iphoneos/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+          cd build/ios/iphoneos
+          zip -r ZahyaStore_iOS.ipa Payload
+          cd ../../..
+
+      - name: Upload iOS IPA (Physical)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-physical
+          path: build/ios/iphoneos/ZahyaStore_iOS.ipa
+
+      - name: Upload iOS Simulator (For Appetize.io)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-build
+          path: build/ios/iphonesimulator/Runner.app
