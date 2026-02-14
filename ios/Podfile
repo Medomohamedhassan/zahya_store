@@ -1,10 +1,22 @@
 # Standard Flutter Podfile
 platform :ios, '15.0'
 
-# Correct path relative to Podfile location (ios/Podfile)
-# podhelper.rb is located at ios/Flutter/podhelper.rb
-podhelper_path = File.join('Flutter', 'podhelper.rb')
-require_relative podhelper_path
+# Dynamically find the Flutter SDK podhelper
+# This ensures we use the version matching the runner's Flutter version
+flutter_root = ENV['FLUTTER_ROOT']
+if flutter_root.nil? || flutter_root.empty?
+  # Fallback for local detection if needed
+  podhelper_path = File.expand_path(File.join('..', 'Flutter', 'podhelper'), __FILE__)
+else
+  podhelper_path = File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper')
+end
+
+if File.exist?("#{podhelper_path}.rb")
+  require podhelper_path
+else
+  # Ultimate fallback
+  require_relative 'Flutter/podhelper' if File.exist?('Flutter/podhelper.rb')
+end
 
 target 'Runner' do
   use_frameworks!
