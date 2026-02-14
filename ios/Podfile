@@ -1,77 +1,21 @@
-# Podfile fixed for GitHub runner
+# Standard Flutter Podfile
 platform :ios, '15.0'
 
-# Manual implementation of Flutter plugin loading to avoid dependency on podhelper.rb
-def flutter_install_ios_engine_pod(ios_application_path)
-  podspec_directory = File.join(ios_application_path, 'Flutter')
-  system("mkdir -p \"#{podspec_directory}\"")
-  copied_podspec_path = File.expand_path('Flutter.podspec', podspec_directory)
-  File.open(copied_podspec_path, 'w') do |podspec|
-    podspec.write <<~EOF
-      Pod::Spec.new do |s|
-        s.name             = 'Flutter'
-        s.version          = '1.0.0'
-        s.summary          = 'A UI toolkit for beautiful and fast apps.'
-        s.homepage         = 'https://flutter.dev'
-        s.license          = { :type => 'BSD' }
-        s.author           = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
-        s.source           = { :git => 'https://github.com/flutter/engine', :tag => s.version.to_s }
-        s.ios.deployment_target = '12.0'
-        s.vendored_frameworks = 'path/to/nothing'
-      end
-    EOF
-  end
-  pod 'Flutter', path: 'Flutter'
-end
-
-def flutter_install_plugin_pods(ios_application_path)
-  plugins_file = File.join(ios_application_path, '..', '.flutter-plugins-dependencies')
-  return unless File.exist?(plugins_file)
-
-  require 'json'
-  dependencies_hash = JSON.parse(File.read(plugins_file))
-  return unless dependencies_hash['plugins'] && dependencies_hash['plugins']['ios']
-
-  dependencies_hash['plugins']['ios'].each do |plugin|
-    plugin_name = plugin['name']
-    plugin_path = plugin['path']
-    shared_darwin_source = plugin['shared_darwin_source'] || false
-    
-    # Path inside the plugin: 'ios' or 'darwin'
-    platform_dir = shared_darwin_source ? 'darwin' : 'ios'
-    
-    # Symlink directory
-    symlink_parent = File.join(ios_application_path, '.symlinks', 'plugins')
-    system("mkdir -p \"#{symlink_parent}\"")
-    
-    # Symlink name
-    symlink = File.join(symlink_parent, plugin_name)
-    
-    # Crucial: On the Mac runner, we need to create the actual symlink to the absolute path
-    # But since we are on Windows, we just write the logic. The Mac runner will run this Ruby code.
-    begin
-      File.symlink(plugin_path, symlink) unless File.exist?(symlink)
-    rescue
-      # Fallback to system command if Ruby symlink fails
-      system("ln -s \"#{plugin_path}\" \"#{symlink}\"")
-    end
-    
-    # Point CocoaPods to the folder containing the .podspec
-    pod plugin_name, path: File.join('.symlinks', 'plugins', plugin_name, platform_dir)
-  end
-end
+# Load the official Flutter podhelper script which we've copied into the project
+podhelper_path = File.expand_path(File.join('..', 'ios', 'Flutter', 'podhelper.rb'), __FILE__)
+require podhelper_path
 
 target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  ios_application_path = File.dirname(File.realpath(__FILE__))
-  flutter_install_ios_engine_pod(ios_application_path)
-  flutter_install_plugin_pods(ios_application_path)
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings['SWIFT_VERSION'] = '5.0'
