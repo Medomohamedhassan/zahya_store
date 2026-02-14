@@ -29,40 +29,6 @@ jobs:
           # Clean existing pods and lock file
           rm -rf Pods
           rm -rf Podfile.lock
-          
-          # If Podfile doesn't exist, create a basic one
-          if [ ! -f Podfile ]; then
-            echo "platform :ios, '15.0'" > Podfile
-            echo "target 'Runner' do" >> Podfile
-            echo "  use_frameworks!" >> Podfile
-            echo "end" >> Podfile
-          fi
-
-          # Update platform to 15.0
-          sed -i '' "s/platform :ios, .*/platform :ios, '15.0'/g" Podfile
-
-          # Inject the necessary fixes into the post_install block if it exists, 
-          # otherwise add a new post_install block.
-          if grep -q "post_install do" Podfile; then
-            # Insert the fixes at the beginning of the existing post_install block
-            sed -i '' '/post_install do |installer|/a\
-              installer.pods_project.targets.each do |target|\
-                target.build_configurations.each do |config|\
-                  config.build_settings["IPHONEOS_DEPLOYMENT_TARGET"] = "15.0"\
-                  config.build_settings["SWIFT_VERSION"] = "5.0"\
-                end\
-              end' Podfile
-          else
-            echo "post_install do |installer|" >> Podfile
-            echo "  installer.pods_project.targets.each do |target|" >> Podfile
-            echo "    target.build_configurations.each do |config|" >> Podfile
-            echo "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'" >> Podfile
-            echo "      config.build_settings['SWIFT_VERSION'] = '5.0'" >> Podfile
-            echo "    end" >> Podfile
-            echo "  end" >> Podfile
-            echo "end" >> Podfile
-          fi
-
           pod install
           cd ..
 
