@@ -1,9 +1,10 @@
 # Standard Flutter Podfile
 platform :ios, '15.0'
 
-# Load the official Flutter podhelper script which we've copied into the project
-podhelper_path = File.expand_path(File.join('..', 'ios', 'Flutter', 'podhelper.rb'), __FILE__)
-require podhelper_path
+# Correct path relative to Podfile location (ios/Podfile)
+# podhelper.rb is located at ios/Flutter/podhelper.rb
+podhelper_path = File.join('Flutter', 'podhelper.rb')
+require_relative podhelper_path
 
 target 'Runner' do
   use_frameworks!
