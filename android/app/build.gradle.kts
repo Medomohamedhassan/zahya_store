@@ -15,14 +15,14 @@ android {
     ndkVersion = "28.0.13004108"
 
     compileOptions {
-        // Enable core library desugaring and use Java 21
+        // Enable core library desugaring and use Java 17
         isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.toVersion(21)
-        targetCompatibility = JavaVersion.toVersion(21)
+        sourceCompatibility = JavaVersion.toVersion(17)
+        targetCompatibility = JavaVersion.toVersion(17)
     }
 
     kotlinOptions {
-        jvmTarget = "21"
+        jvmTarget = "17"
     }
 
     defaultConfig {
